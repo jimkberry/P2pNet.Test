@@ -1,0 +1,148 @@
+﻿using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using NUnit.Framework;
+using Newtonsoft.Json;
+using P2pNet;
+
+namespace Tests
+{
+    [TestFixture]
+    public class P2pRedisTests
+    {
+        public class P2pMsg
+        {
+            public string _channel;
+            public string _sender;
+            public string _msgType;
+            public string _msgData;
+            public P2pMsg(string channel, string sender, string type, string msg)
+            {
+                _channel = channel;
+                _sender = sender;
+                _msgType = type;
+                _msgData = msg;
+            }
+        }
+
+        public class PeerThingy
+        {
+            public IP2pNet _p2p;
+            public List<P2pMsg> _rcvdMessages = new List<P2pMsg>{};
+            public PeerThingy(string connectStr, string gameCh)
+            {
+                _p2p = new P2pRedis(connectStr);
+                Assert.That(_p2p, Is.Not.Null);
+                _p2p.EvtReceivedNetMessage += handleNetMessage;                         
+                _p2p.listen(gameCh);            
+            }
+            protected void handleNetMessage(object sender, NetMessageArgs msgArgs)
+            {
+                _rcvdMessages.Add(new P2pMsg(msgArgs.Channel, msgArgs.Message.senderId, msgArgs.Message.msgType, msgArgs.Message.msgData));               
+            }
+        }
+
+        public string redisConnectionStr = "sparkyx.local,password=sparky-redis79";
+        public string gameChannel = "gameChannel";        
+
+        [SetUp]
+        public void Setup()
+        {
+        }
+
+        [Test]
+        public void ShouldCreateP2pRedis()
+        {
+            IP2pNet p2p = new P2pRedis(redisConnectionStr);
+            Assert.That(p2p, Is.Not.Null); 
+            Assert.That(p2p.P2pId, Is.Not.Null);
+        }
+
+        [Test]
+        public void TwoPeersShouldInit()
+        {
+            PeerThingy p1 = new PeerThingy(redisConnectionStr, gameChannel);
+            Assert.That(p1, Is.Not.Null); 
+            PeerThingy p2 = new PeerThingy(redisConnectionStr, gameChannel);
+            Assert.That(p2, Is.Not.Null);
+            Assert.That(p1._p2p.P2pId, Is.Not.EqualTo(p2._p2p.P2pId));   
+        }
+
+        // await Task.Delay() is stoooopid!!!
+        // See: https://github.com/StackExchange/StackExchange.Redis/blob/master/tests/StackExchange.Redis.Tests/PubSub.cs#L176
+        // for a (slightly complicated) better way.
+        [Test]
+        public async Task TwoPeersShouldTalk()
+        {
+            PeerThingy p1 = new PeerThingy(redisConnectionStr, gameChannel);
+            Assert.That(p1, Is.Not.Null); 
+            PeerThingy p2 = new PeerThingy(redisConnectionStr, gameChannel);
+            Assert.That(p2, Is.Not.Null);
+            p1._p2p.send(gameChannel, "type1", "game msg 1");
+            await Task.Delay(250); // &&& SUPER LAME!!!!      
+
+            Assert.That(p1._rcvdMessages.Count, Is.EqualTo(1));
+            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(1)); 
+            p2._p2p.send(gameChannel, "type2", "game msg 2");             
+            await Task.Delay(250);
+
+            Assert.That(p1._rcvdMessages.Count, Is.EqualTo(2));
+            Assert.That(p1._rcvdMessages[0]._msgType, Is.EqualTo("type1"));
+            Assert.That(p1._rcvdMessages[1]._msgType, Is.EqualTo("type2"));
+
+            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(2));    
+            Assert.That(p2._rcvdMessages[0]._msgType, Is.EqualTo("type1"));            
+            Assert.That(p2._rcvdMessages[1]._msgType, Is.EqualTo("type2"));                                  
+        }    
+
+
+        public class JsonTestThing
+        {
+            public string words;
+            public int anInt;
+            public double aDouble;
+
+            public string ToJson()
+            {
+                 return JsonConvert.SerializeObject(this);
+            }
+
+            public static string ToJson(string words, int anInt, double aDouble)
+            {
+                // {"words":"<words>","anInt":<intVal>,"aDouble":"<floatVal>"}
+                return JsonConvert.SerializeObject( new JsonTestThing {
+                    words = words, 
+                    anInt = anInt,
+                    aDouble = aDouble 
+                });   
+            }
+        }
+
+
+        [Test]
+        public async Task PeersShouldSendJsonPayload()
+        {
+            PeerThingy p1 = new PeerThingy(redisConnectionStr, gameChannel);
+            Assert.That(p1, Is.Not.Null); 
+            PeerThingy p2 = new PeerThingy(redisConnectionStr, gameChannel);
+            Assert.That(p2, Is.Not.Null);
+            
+            JsonTestThing payload = new JsonTestThing {
+                    words = "the words", 
+                    anInt = 273,
+                    aDouble = 1.324 
+                };        
+         
+            p1._p2p.send(gameChannel, "jsonTest", payload.ToJson());
+            await Task.Delay(250); // &&& SUPER LAME!!!!      
+
+            Assert.That(p1._rcvdMessages.Count, Is.EqualTo(1));
+            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(1)); 
+
+            JsonTestThing msgContents = JsonConvert.DeserializeObject<JsonTestThing>(p2._rcvdMessages[0]._msgData);          
+            Assert.That(msgContents.ToJson(), Is.EqualTo(payload.ToJson()));                                              
+        }  
+
+    }
+}
