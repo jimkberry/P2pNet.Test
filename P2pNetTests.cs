@@ -6,30 +6,29 @@ using NUnit.Framework;
 using Newtonsoft.Json;
 using P2pNet;
 
-namespace Tests
+namespace P2pNetTests
 {
 
     public class TestClient : IP2pNetClient
     {
         public class PeerData
         {
-            string town;
-            string name;
+            public string town;
+            public string name;
             public PeerData(string _name, string _town)
             {
                 town = _town;
                 name = _name;
             }
-
         }
 
         public class MsgRecord
         {
             public string from;
             public string to;
-            public object msgData;
+            public string msgData;
 
-            public MsgRecord(string _from, string _to, object _msgData)
+            public MsgRecord(string _from, string _to, string _msgData)
             {
                 from = _from;
                 to = _to;
@@ -63,20 +62,19 @@ namespace Tests
             return p2pId = p2p.Join(gameChannel);
         }
 
-
-        public object P2pHelloData()
+        public string P2pHelloData()
         {
-            return new PeerData(name, town);
+            return JsonConvert.SerializeObject(new PeerData(name, town));
         }
-        public void OnPeerJoined(string p2pId, object helloData)
+        public void OnPeerJoined(string p2pId, string helloData)
         {
-            localPeers[p2pId] = ( helloData as PeerData);
+            localPeers[p2pId] = JsonConvert.DeserializeObject<PeerData>(helloData);
         }
         public void OnPeerLeft(string p2pId)
         {
             localPeers.Remove(p2pId);
         }
-        public void OnP2pMsg(string from, string to, object msgData)
+        public void OnP2pMsg(string from, string to, string msgData)
         {
             msgList.Add( new MsgRecord(from, to, msgData));
         }
@@ -144,17 +142,19 @@ namespace Tests
             tcEllen.Connect(redisConnectionStr);
 
             await Task.Delay(100);
+            Assert.That(tcJim.localPeers.Values.Count, Is.EqualTo(0));            
             tcJim.Join(testGameChannel);
 
             await Task.Delay(300);
             tcEllen.Join(testGameChannel);
 
             await Task.Delay(300);
+            //Assert.That(tcJim.localPeers[tcEllen.p2pId], Is.Not.Null);
             Assert.That(tcJim.localPeers.Values.Count, Is.EqualTo(2));
             Assert.That(tcEllen.msgList.Count, Is.EqualTo(0));
             Assert.That(tcJim.msgList.Count, Is.EqualTo(0));
-            tcJim.p2p.Send(testGameChannel, (object)"Hello game channel");
-            tcJim.p2p.Send(tcEllen.p2pId, (object)"Hello Ellen");
+            tcJim.p2p.Send(testGameChannel, "Hello game channel");
+            tcJim.p2p.Send(tcEllen.p2pId, "Hello Ellen");
 
             await Task.Delay(200);
             Assert.That(tcEllen.msgList.Count, Is.EqualTo(2));
