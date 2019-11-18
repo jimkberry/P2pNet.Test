@@ -69,6 +69,7 @@ namespace P2pNetTests
         public void OnPeerJoined(string p2pId, string helloData)
         {
             localPeers[p2pId] = JsonConvert.DeserializeObject<PeerData>(helloData);
+            TestContext.Out.WriteLine(string.Format("{0} joined. Name: {1}", p2pId, localPeers[p2pId].name));            
         }
         public void OnPeerLeft(string p2pId)
         {
@@ -84,7 +85,6 @@ namespace P2pNetTests
     public class P2pRedisTests
     {
         public string redisConnectionStr = "sparkyx,password=sparky-redis79";
-        public string testGameChannel = "testGameChannel";
 
         [SetUp]
         public void Setup()
@@ -120,6 +120,7 @@ namespace P2pNetTests
         [Test]
         public async Task ClientShouldJoin()
         {
+            string testGameChannel = System.Guid.NewGuid().ToString(); // if tests run in parallel they need separate channels
             //same as above, really
             TestClient tc = new TestClient("jim","meredith");
             tc.Connect(redisConnectionStr);
@@ -134,6 +135,8 @@ namespace P2pNetTests
         [Test]
         public async Task TwoClientsShouldTalk()
         {
+            string testGameChannel = System.Guid.NewGuid().ToString();
+
             TestClient tcJim = new TestClient("jim","meredith");
             tcJim.Connect(redisConnectionStr);
 
