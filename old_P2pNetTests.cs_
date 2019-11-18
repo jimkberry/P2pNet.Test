@@ -34,17 +34,17 @@ namespace Tests
             {
                 _p2p = new P2pRedis(connectStr);
                 Assert.That(_p2p, Is.Not.Null);
-                _p2p.EvtReceivedNetMessage += handleNetMessage;                         
-                _p2p.listen(gameCh);            
+                _p2p.EvtReceivedNetMessage += handleNetMessage;
+                _p2p.listen(gameCh);
             }
             protected void handleNetMessage(object sender, NetMessageArgs msgArgs)
             {
-                _rcvdMessages.Add(new P2pMsg(msgArgs.Channel, msgArgs.Message.senderId, msgArgs.Message.msgType, msgArgs.Message.msgData));               
+                _rcvdMessages.Add(new P2pMsg(msgArgs.Channel, msgArgs.Message.senderId, msgArgs.Message.msgType, msgArgs.Message.msgData));
             }
         }
 
         public string redisConnectionStr = "sparkyx.local,password=sparky-redis79";
-        public string gameChannel = "gameChannel";        
+        public string gameChannel = "gameChannel";
 
         [SetUp]
         public void Setup()
@@ -55,7 +55,7 @@ namespace Tests
         public void ShouldCreateP2pRedis()
         {
             IP2pNet p2p = new P2pRedis(redisConnectionStr);
-            Assert.That(p2p, Is.Not.Null); 
+            Assert.That(p2p, Is.Not.Null);
             Assert.That(p2p.P2pId, Is.Not.Null);
         }
 
@@ -63,10 +63,10 @@ namespace Tests
         public void TwoPeersShouldInit()
         {
             PeerThingy p1 = new PeerThingy(redisConnectionStr, gameChannel);
-            Assert.That(p1, Is.Not.Null); 
+            Assert.That(p1, Is.Not.Null);
             PeerThingy p2 = new PeerThingy(redisConnectionStr, gameChannel);
             Assert.That(p2, Is.Not.Null);
-            Assert.That(p1._p2p.P2pId, Is.Not.EqualTo(p2._p2p.P2pId));   
+            Assert.That(p1._p2p.P2pId, Is.Not.EqualTo(p2._p2p.P2pId));
         }
 
         // await Task.Delay() is stoooopid!!!
@@ -76,25 +76,25 @@ namespace Tests
         public async Task TwoPeersShouldTalk()
         {
             PeerThingy p1 = new PeerThingy(redisConnectionStr, gameChannel);
-            Assert.That(p1, Is.Not.Null); 
+            Assert.That(p1, Is.Not.Null);
             PeerThingy p2 = new PeerThingy(redisConnectionStr, gameChannel);
             Assert.That(p2, Is.Not.Null);
             p1._p2p.send(gameChannel, "type1", "game msg 1");
-            await Task.Delay(250); // &&& SUPER LAME!!!!      
+            await Task.Delay(250); // &&& SUPER LAME!!!!
 
             Assert.That(p1._rcvdMessages.Count, Is.EqualTo(1));
-            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(1)); 
-            p2._p2p.send(gameChannel, "type2", "game msg 2");             
+            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(1));
+            p2._p2p.send(gameChannel, "type2", "game msg 2");
             await Task.Delay(250);
 
             Assert.That(p1._rcvdMessages.Count, Is.EqualTo(2));
             Assert.That(p1._rcvdMessages[0]._msgType, Is.EqualTo("type1"));
             Assert.That(p1._rcvdMessages[1]._msgType, Is.EqualTo("type2"));
 
-            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(2));    
-            Assert.That(p2._rcvdMessages[0]._msgType, Is.EqualTo("type1"));            
-            Assert.That(p2._rcvdMessages[1]._msgType, Is.EqualTo("type2"));                                  
-        }    
+            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(2));
+            Assert.That(p2._rcvdMessages[0]._msgType, Is.EqualTo("type1"));
+            Assert.That(p2._rcvdMessages[1]._msgType, Is.EqualTo("type2"));
+        }
 
 
         public class JsonTestThing
@@ -112,10 +112,10 @@ namespace Tests
             {
                 // {"words":"<words>","anInt":<intVal>,"aDouble":"<floatVal>"}
                 return JsonConvert.SerializeObject( new JsonTestThing {
-                    words = words, 
+                    words = words,
                     anInt = anInt,
-                    aDouble = aDouble 
-                });   
+                    aDouble = aDouble
+                });
             }
         }
 
@@ -124,25 +124,25 @@ namespace Tests
         public async Task PeersShouldSendJsonPayload()
         {
             PeerThingy p1 = new PeerThingy(redisConnectionStr, gameChannel);
-            Assert.That(p1, Is.Not.Null); 
+            Assert.That(p1, Is.Not.Null);
             PeerThingy p2 = new PeerThingy(redisConnectionStr, gameChannel);
             Assert.That(p2, Is.Not.Null);
-            
+
             JsonTestThing payload = new JsonTestThing {
-                    words = "the words", 
+                    words = "the words",
                     anInt = 273,
-                    aDouble = 1.324 
-                };        
-         
+                    aDouble = 1.324
+                };
+
             p1._p2p.send(gameChannel, "jsonTest", payload.ToJson());
-            await Task.Delay(250); // &&& SUPER LAME!!!!      
+            await Task.Delay(250); // &&& SUPER LAME!!!!
 
             Assert.That(p1._rcvdMessages.Count, Is.EqualTo(1));
-            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(1)); 
+            Assert.That(p2._rcvdMessages.Count, Is.EqualTo(1));
 
-            JsonTestThing msgContents = JsonConvert.DeserializeObject<JsonTestThing>(p2._rcvdMessages[0]._msgData);          
-            Assert.That(msgContents.ToJson(), Is.EqualTo(payload.ToJson()));                                              
-        }  
+            JsonTestThing msgContents = JsonConvert.DeserializeObject<JsonTestThing>(p2._rcvdMessages[0]._msgData);
+            Assert.That(msgContents.ToJson(), Is.EqualTo(payload.ToJson()));
+        }
 
     }
 }

@@ -23,15 +23,33 @@ namespace Tests
 
         }
 
+        public class MsgRecord
+        {
+            public string from;
+            public string to;
+            public object msgData;
+
+            public MsgRecord(string _from, string _to, object _msgData)
+            {
+                from = _from;
+                to = _to;
+                msgData = _msgData;
+            }
+        }
         public IP2pNet p2p;
         public string name;
         public string town;
         public string p2pId;
+        public Dictionary<string, PeerData> localPeers;
+        public List<MsgRecord> msgList;
+
 
         public TestClient(string _name, string _town)
         {
             town = _town;
             name = _name;
+            localPeers = new Dictionary<string, PeerData>();
+            msgList = new List<MsgRecord>();
         }
 
         public bool Connect(string connectionStr)
@@ -52,15 +70,15 @@ namespace Tests
         }
         public void OnPeerJoined(string p2pId, object helloData)
         {
-
+            localPeers[p2pId] = ( helloData as PeerData);
         }
         public void OnPeerLeft(string p2pId)
         {
-
+            localPeers.Remove(p2pId);
         }
         public void OnP2pMsg(string from, string to, object msgData)
         {
-
+            msgList.Add( new MsgRecord(from, to, msgData));
         }
     }
 
@@ -102,7 +120,7 @@ namespace Tests
         }
 
         [Test]
-        public void ClientShouldJoin()
+        public async Task ClientShouldJoin()
         {
             //same as above, really
             TestClient tc = new TestClient("jim","meredith");
@@ -111,6 +129,36 @@ namespace Tests
             Assert.That(returnedId, Is.Not.Null);
             Assert.That(tc.p2p.GetId(), Is.EqualTo(returnedId));
             Assert.That(tc.p2pId, Is.EqualTo(returnedId));
+            await Task.Delay(250); // &&& SUPER LAME!!!!
+            Assert.That(tc.p2p.GetPeerIds().Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task TwoClientsShouldTalk()
+        {
+            TestClient tcJim = new TestClient("jim","meredith");
+            tcJim.Connect(redisConnectionStr);
+
+            await Task.Delay(250);
+            TestClient tcEllen = new TestClient("ellen","raymond");
+            tcEllen.Connect(redisConnectionStr);
+
+            await Task.Delay(100);
+            tcJim.Join(testGameChannel);
+
+            await Task.Delay(300);
+            tcEllen.Join(testGameChannel);
+
+            await Task.Delay(300);
+            Assert.That(tcJim.localPeers.Values.Count, Is.EqualTo(2));
+            Assert.That(tcEllen.msgList.Count, Is.EqualTo(0));
+            Assert.That(tcJim.msgList.Count, Is.EqualTo(0));
+            tcJim.p2p.Send(testGameChannel, (object)"Hello game channel");
+            tcJim.p2p.Send(tcEllen.p2pId, (object)"Hello Ellen");
+
+            await Task.Delay(200);
+            Assert.That(tcEllen.msgList.Count, Is.EqualTo(2));
+            Assert.That(tcJim.msgList.Count, Is.EqualTo(1));
         }
     }
 
