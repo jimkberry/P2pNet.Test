@@ -154,6 +154,7 @@ namespace P2pNetTests
             await Task.Delay(300);
             //Assert.That(tcJim.localPeers[tcEllen.p2pId], Is.Not.Null);
             Assert.That(tcJim.localPeers.Values.Count, Is.EqualTo(2));
+            Assert.That(tcEllen.localPeers.Values.Count, Is.EqualTo(2));            
             Assert.That(tcEllen.msgList.Count, Is.EqualTo(0));
             Assert.That(tcJim.msgList.Count, Is.EqualTo(0));
             tcJim.p2p.Send(testGameChannel, "Hello game channel");
