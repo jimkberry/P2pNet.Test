@@ -59,7 +59,8 @@ namespace P2pNetTests
 
         public string Join(string gameChannel)
         {
-            return p2pId = p2p.Join(gameChannel);
+            p2pId = p2p.Join(gameChannel);
+            return p2pId;
         }
 
         public string P2pHelloData()
@@ -128,8 +129,12 @@ namespace P2pNetTests
             Assert.That(returnedId, Is.Not.Null);
             Assert.That(tc.p2p.GetId(), Is.EqualTo(returnedId));
             Assert.That(tc.p2pId, Is.EqualTo(returnedId));
+            tc.p2p.Send(testGameChannel, "Hello game channel");            
+
             await Task.Delay(250); // &&& SUPER LAME!!!!
-            Assert.That(tc.p2p.GetPeerIds().Count, Is.EqualTo(1));
+            tc.p2p.Loop();
+            Assert.That(tc.p2p.GetPeerIds().Count, Is.EqualTo(0)); // should be zero. We're not in our own list
+            Assert.That(tc.msgList.Count, Is.EqualTo(1));
         }
 
         [Test]
@@ -141,26 +146,43 @@ namespace P2pNetTests
             tcJim.Connect(redisConnectionStr);
 
             await Task.Delay(250);
+            tcJim.p2p.Loop();            ;              
             TestClient tcEllen = new TestClient("ellen","raymond");
             tcEllen.Connect(redisConnectionStr);
 
             await Task.Delay(100);
+            tcJim.p2p.Loop();            
+            tcEllen.p2p.Loop();              
             Assert.That(tcJim.localPeers.Values.Count, Is.EqualTo(0));            
             tcJim.Join(testGameChannel);
 
             await Task.Delay(300);
+            tcJim.p2p.Loop();            
+            tcEllen.p2p.Loop();        
             tcEllen.Join(testGameChannel);
 
-            await Task.Delay(300);
-            //Assert.That(tcJim.localPeers[tcEllen.p2pId], Is.Not.Null);
-            Assert.That(tcJim.localPeers.Values.Count, Is.EqualTo(2));
-            Assert.That(tcEllen.localPeers.Values.Count, Is.EqualTo(2));            
+            await Task.Delay(100); // THe join hello/response handshake takes 2 loops
+            tcJim.p2p.Loop();            
+            tcEllen.p2p.Loop();  
+
+            await Task.Delay(100); // THe join hello/response handshake takes 2 loops
+            tcJim.p2p.Loop();            
+            tcEllen.p2p.Loop();  
+
+            await Task.Delay(100);
+            tcJim.p2p.Loop();            
+            tcEllen.p2p.Loop();            
+            //Assert.That(tcJim.localPeers[tcEllen.p2pId], Is.EqualTo(tcEllen.localPeers[tcEllen.p2pId]));
+            Assert.That(tcJim.localPeers.Keys.Count, Is.EqualTo(1));
+            Assert.That(tcEllen.localPeers.Keys.Count, Is.EqualTo(1));            
             Assert.That(tcEllen.msgList.Count, Is.EqualTo(0));
             Assert.That(tcJim.msgList.Count, Is.EqualTo(0));
             tcJim.p2p.Send(testGameChannel, "Hello game channel");
             tcJim.p2p.Send(tcEllen.p2pId, "Hello Ellen");
 
             await Task.Delay(200);
+            tcJim.p2p.Loop();            
+            tcEllen.p2p.Loop();              
             Assert.That(tcEllen.msgList.Count, Is.EqualTo(2));
             Assert.That(tcJim.msgList.Count, Is.EqualTo(1));
         }
